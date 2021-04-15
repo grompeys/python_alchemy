@@ -1,5 +1,5 @@
 # pylint: disable=import-error
-from flask_jwt import jwt_required
+from flask_jwt_extended import jwt_required, get_jwt, get_jwt_identity
 from flask_restful import Resource, reqparse
 # pylint: enable=import-error
 
@@ -21,7 +21,9 @@ class Item(Resource):
         help='Every item must belong to a store.'
     )
 
-    @jwt_required()
+    # Only allow fresh JWTs to access this route 
+    # with the `fresh=True` arguement.
+    @jwt_required(fresh=True)
     def post(self, name):
         if ItemModel.find_by_name(name):
             return {
@@ -79,8 +81,13 @@ class Item(Resource):
 
     @jwt_required()
     def delete(self, name):
-        item = ItemModel.find_by_name(name)
+        claims = get_jwt()
+        if not claims['is_admin']:
+            return {
+                'message': 'Admin privilege required.'
+            }, 401
 
+        item = ItemModel.find_by_name(name)
         if item:
             try:
                 item.delete()
@@ -99,16 +106,22 @@ class Item(Resource):
 
 class ItemList(Resource):
 
-    @jwt_required()
+    @jwt_required(optional=True)
     def get(self):
-        items = {
-            'items': [
-                row.json() for row in ItemModel.query.all()
-            ]
-        }
+        user_id = get_jwt_identity()
+
+        items = [
+            row.json() for row in ItemModel.find_all()
+        ]
 
         if items:
-            return items, 200
+            if user_id:
+                return {'items': items}, 200
+            return {
+                # returns only the item's name
+                'items': [item['name'] for item in items],
+                'message': 'More data available if you log in.'
+            }, 200
         return {
             'items': None,
             'message': 'No items found.'

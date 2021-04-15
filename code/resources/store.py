@@ -1,6 +1,6 @@
 # pylint: disable=import-error
 import psycopg2
-from flask_jwt import jwt_required
+from flask_jwt_extended import jwt_required
 from flask_restful import Resource
 # pylint: enable=import-error
 
@@ -68,6 +68,6 @@ class StoreList(Resource):
     def get(self):
         return {
             'stores': [
-                store.json() for store in StoreModel.query.all()
+                store.json() for store in StoreModel.find_all()
             ]
         }, 200
